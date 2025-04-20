@@ -33,7 +33,10 @@ function getCurrentFunctionName() {
  *
  */
 function getFunctionBody(func) {
-  return func === undefined ? '' : func.toString();
+  if (!func || typeof func !== 'function') {
+    return '';
+  }
+  return func.toString();
 }
 
 /**
@@ -71,9 +74,7 @@ function getArgumentsCount(funcs) {
  *
  */
 function getPowerFunction(exponent) {
-  return function power(x) {
-    return x ** exponent;
-  };
+  return (x) => x ** exponent;
 }
 
 /**
@@ -89,14 +90,16 @@ function getPowerFunction(exponent) {
  *   getPolynom(8)     => y = 8
  *   getPolynom()      => null
  */
-function getPolynom(...coeffs) {
-  const coeffsCount = coeffs.length;
-  if (coeffsCount === 0) return null;
-  if (coeffsCount === 1) return () => coeffs[0];
-  if (coeffsCount === 2) return (x) => coeffs[0] * x + coeffs[1];
-  if (coeffsCount >= 3)
-    return (x) => coeffs[0] * x ** 2 + coeffs[1] * x + coeffs[2];
-  return null;
+function getPolynom(...coefficients) {
+  if (coefficients.length === 0) {
+    return null;
+  }
+
+  return (x) => {
+    return coefficients.reduce((result, coefficient, index) => {
+      return result + coefficient * x ** (coefficients.length - 1 - index);
+    }, 0);
+  };
 }
 
 /**
@@ -114,15 +117,15 @@ function getPolynom(...coeffs) {
  *   memoizer() => the same random number  (next run, returns the previous cached result)
  */
 function memoize(func) {
-  let cachedResult;
-  let isCached = false;
+  let cached = false;
+  let result;
 
-  return function memoized() {
-    if (!isCached) {
-      cachedResult = func();
-      isCached = true;
+  return (...args) => {
+    if (!cached) {
+      result = func.apply(this, args);
+      cached = true;
     }
-    return cachedResult;
+    return result;
   };
 }
 
@@ -142,19 +145,16 @@ function memoize(func) {
  * retryer() => 2
  */
 function retry(func, attempts) {
-  return function retryFunc() {
-    let result;
-    let error;
-
+  return (...args) => {
+    let lastError;
     for (let i = 0; i < attempts; i += 1) {
       try {
-        result = func();
-        return result;
-      } catch (e) {
-        error = e;
+        return func(...args);
+      } catch (error) {
+        lastError = error;
       }
     }
-    throw error;
+    throw lastError;
   };
 }
 
@@ -182,11 +182,11 @@ function retry(func, attempts) {
  *
  */
 function logger(func, logFunc) {
-  return function loggerFunc(...args) {
-    const argsString = args.map((arg) => JSON.stringify(arg)).join(',');
-    logFunc(`${func.name}(${argsString}) starts`);
-    const result = func(...args);
-    logFunc(`${func.name}(${argsString}) ends`);
+  return (...args) => {
+    const argsStr = args.map((arg) => JSON.stringify(arg)).join(',');
+    logFunc(`${func.name}(${argsStr}) starts`);
+    const result = func.apply(this, args);
+    logFunc(`${func.name}(${argsStr}) ends`);
     return result;
   };
 }
@@ -205,9 +205,7 @@ function logger(func, logFunc) {
  *   partialUsingArguments(fn, 'a','b','c','d')() => 'abcd'
  */
 function partialUsingArguments(fn, ...args1) {
-  return function partialFunc(...args2) {
-    return fn(...args1, ...args2);
-  };
+  return (...args2) => fn(...args1, ...args2);
 }
 
 /**
@@ -230,7 +228,7 @@ function partialUsingArguments(fn, ...args1) {
 function getIdGeneratorFunction(startFrom) {
   let currentId = startFrom;
 
-  return function idGenerator() {
+  return () => {
     const id = currentId;
     currentId += 1;
     return id;
